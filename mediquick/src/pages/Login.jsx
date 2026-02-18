@@ -3,26 +3,59 @@ import { ERPContext } from "../context/ERPContext";
 
 export default function Login() {
   const { login } = useContext(ERPContext);
-  const [isSignUp, setIsSignUp] = useState(false);  // Toggle between Login and Register
+  const [isSignUp, setIsSignUp] = useState(false); // Toggle between Login and Register
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (email === "admin@mediquick.com" && password === "1234") {
-      login(email);
-    } else {
-      alert("Invalid credentials");
+
+    try {
+      const response = await fetch(
+        "http://localhost/mediquick-api/process_login.php",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        login(data.user_email); // Use the data from your DB
+      } else {
+        alert(data.message || "Invalid credentials");
+      }
+    } catch (error) {
+      console.error("Error:", error);
     }
   };
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
-    if (email && password) {
-      login(email);
-      alert("Registration successful!");
-    } else {
-      alert("Please fill in both fields.");
+
+    try {
+      const response = await fetch(
+        "http://localhost/mediquick-api/process_register.php",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert("Registration successful!");
+        setIsSignUp(false); // Switch to login view
+      } else {
+        alert(data.message || "Registration failed");
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Could not connect to the server.");
     }
   };
 
@@ -62,9 +95,7 @@ export default function Login() {
         </form>
 
         <p className="text-sm text-gray-500 mt-4 text-center">
-          {isSignUp
-            ? "Already have an account? "
-            : "Don't have an account? "}
+          {isSignUp ? "Already have an account? " : "Don't have an account? "}
           <button
             onClick={() => setIsSignUp(!isSignUp)}
             className="text-blue-600 hover:text-blue-800"
