@@ -1,114 +1,228 @@
-import React, { useState, useContext } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { ERPContext } from "../context/ERPContext";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import { Icon } from "leaflet";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
-// Default icon for marker
-const defaultIcon = new Icon({
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
+// Fix Leaflet marker icons
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "/leaflet/marker-icon-2x.png",
+  iconUrl: "/leaflet/marker-icon.png",
+  shadowUrl: "/leaflet/marker-shadow.png",
 });
 
 export default function OrderPage() {
-  const { branches } = useContext(ERPContext);
-  const [orderType, setOrderType] = useState(null);  // "delivery" or "pickup"
-  const [nearestBranch, setNearestBranch] = useState(null);
+  const { orderType } = useContext(ERPContext);
 
-  const userLocation = [14.6, 120.98]; // Example user location
+  const [userLocation, setUserLocation] = useState(null);
+  const [pharmacies, setPharmacies] = useState([]);
+  const [selectedPharmacy, setSelectedPharmacy] = useState(null);
+  const [confirmedPharmacy, setConfirmedPharmacy] = useState(null);
+  const [orderPlaced, setOrderPlaced] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const getDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371; // Earth's radius in km
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const [medicines] = useState([
+    { id: 1, name: "Paracetamol", img: "/images/paracetamol.png", controlled: false },
+    { id: 2, name: "Amoxicillin", img: "/images/amoxicillin.png", controlled: false },
+    { id: 3, name: "Ibuprofen", img: "/images/ibuprofen.png", controlled: false },
+    { id: 4, name: "Ephedrine", img: "/images/ephedrine.png", controlled: true },
+  ]);
+  const [selectedMedicines, setSelectedMedicines] = useState([]);
+  const [prescription, setPrescription] = useState(null);
+  const [paymentDone, setPaymentDone] = useState(false);
 
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
-
-  const findNearestPharmacy = () => {
-    let closest = null;
-    let minDistance = Infinity;
-
-    branches.forEach((branch) => {
-      const distance = getDistance(
-        userLocation[0],
-        userLocation[1],
-        branch.position[0],
-        branch.position[1]
-      );
-
-      if (distance < minDistance) {
-        minDistance = distance;
-        closest = branch;
+  // Get user location
+  useEffect(() => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation([position.coords.latitude, position.coords.longitude]);
+      },
+      () => {
+        alert("Unable to get your location");
       }
-    });
+    );
+  }, []);
 
-    setNearestBranch(closest);
+  // Fetch nearby pharmacies
+  useEffect(() => {
+    if (!userLocation) return;
+    fetchNearbyPharmacies(userLocation[0], userLocation[1]);
+  }, [userLocation]);
+
+  const fetchNearbyPharmacies = async (lat, lon) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const query = `
+        [out:json];
+        node["amenity"="pharmacy"](around:1000,${lat},${lon});
+        out;
+      `;
+
+      const response = await fetch("https://overpass.kumi.systems/api/interpreter", {
+        method: "POST",
+        body: query,
+      });
+
+      const text = await response.text();
+      if (text.startsWith("<?xml")) throw new Error("Overpass API timeout");
+
+      const data = JSON.parse(text);
+      const results = data.elements.map((el) => ({
+        id: el.id,
+        name: el.tags?.name || "Unnamed Pharmacy",
+        lat: el.lat,
+        lon: el.lon,
+      }));
+
+      setPharmacies(results.slice(0, 10));
+      setLoading(false);
+    } catch (err) {
+      console.error("Overpass error:", err);
+      setError("Could not load pharmacies. Please try again.");
+      setLoading(false);
+    }
   };
 
-  const handleOrderType = (type) => {
-    setOrderType(type);
-    findNearestPharmacy();
+  const handleConfirmPharmacy = () => {
+    if (!selectedPharmacy) return;
+    setConfirmedPharmacy(selectedPharmacy);
+    setSelectedPharmacy(null);
   };
+
+  const toggleMedicine = (med) => {
+    const alreadySelected = selectedMedicines.find((m) => m.id === med.id);
+    if (alreadySelected) {
+      setSelectedMedicines(selectedMedicines.filter((m) => m.id !== med.id));
+    } else {
+      setSelectedMedicines([...selectedMedicines, med]);
+    }
+  };
+
+  const requiresPrescription = selectedMedicines.some((m) => m.controlled);
+
+  const handleUploadPrescription = (e) => {
+    setPrescription(e.target.files[0]);
+  };
+
+  const handlePlaceOrder = () => {
+    if (requiresPrescription && !prescription) {
+      alert("Prescription required for controlled medicine!");
+      return;
+    }
+    setOrderPlaced(true);
+  };
+
+  if (!userLocation) return <div className="text-center mt-10">Getting your location...</div>;
 
   return (
-    <div className="p-8 bg-gray-100 min-h-screen">
-      <h1 className="text-3xl font-bold mb-6">MediQuick ERP - Order</h1>
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">
+        {orderType === "delivery" ? "Delivery Order" : "Pickup Order - Select Pharmacy"}
+      </h1>
 
-      {/* Order Type Options */}
-      {!orderType && (
-        <div className="space-y-4">
+      {loading && <p>Loading pharmacies...</p>}
+      {error && <p className="text-red-500">{error}</p>}
+
+      {/* MAP */}
+      {!confirmedPharmacy && (
+        <MapContainer center={userLocation} zoom={15} style={{ height: "500px", width: "100%" }}>
+          <TileLayer
+            attribution="© OpenStreetMap contributors"
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <Marker position={userLocation}>
+            <Popup>You are here</Popup>
+          </Marker>
+          {pharmacies.map((pharmacy) => (
+            <Marker
+              key={pharmacy.id}
+              position={[pharmacy.lat, pharmacy.lon]}
+              eventHandlers={{ click: () => setSelectedPharmacy(pharmacy) }}
+            >
+              <Popup>{pharmacy.name}</Popup>
+            </Marker>
+          ))}
+        </MapContainer>
+      )}
+
+      {/* SELECTED PHARMACY */}
+      {selectedPharmacy && !confirmedPharmacy && (
+        <div className="mt-4 p-4 bg-white shadow rounded">
+          <h2 className="text-lg font-semibold">Selected: {selectedPharmacy.name}</h2>
           <button
-            onClick={() => handleOrderType("delivery")}
-            className="w-full bg-green-600 text-white py-3 rounded hover:bg-green-700 transition"
+            className="mt-2 bg-blue-600 text-white px-4 py-2 rounded"
+            onClick={handleConfirmPharmacy}
           >
-            Delivery
-          </button>
-          <button
-            onClick={() => handleOrderType("pickup")}
-            className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 transition"
-          >
-            Pickup
+            Confirm Pharmacy
           </button>
         </div>
       )}
 
-      {/* Map for Delivery/Pickup */}
-      {orderType && (
-        <div className="mt-10 h-[400px] rounded-xl overflow-hidden shadow-lg">
-          <MapContainer center={userLocation} zoom={12} className="h-full w-full">
-            <TileLayer
-              attribution="© OpenStreetMap contributors"
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
+      {/* MEDICINES */}
+      {confirmedPharmacy && !orderPlaced && (
+        <div className="mt-6 p-6 bg-green-50 border rounded text-center">
+          <h2 className="text-xl font-semibold mb-4">
+            Ordering from: {confirmedPharmacy.name}
+          </h2>
 
-            {branches &&
-              branches.map((branch) => (
-                <Marker key={branch.id} position={branch.position} icon={defaultIcon}>
-                  <Popup>{branch.name}</Popup>
-                </Marker>
-              ))}
+          <p className="mb-3">Select medicines:</p>
+          <div className="flex flex-wrap justify-center gap-4 mb-4">
+            {medicines.map((med) => (
+              <div
+                key={med.id}
+                className={`border rounded-lg p-2 cursor-pointer ${
+                  selectedMedicines.includes(med) ? "border-green-600" : "border-gray-300"
+                }`}
+                onClick={() => toggleMedicine(med)}
+              >
+                <img src={med.img} alt={med.name} className="w-36 h-36 object-cover rounded" />
+                <p className="mt-1 font-medium">{med.name}</p>
+              </div>
+            ))}
+          </div>
 
-            {nearestBranch && (
-              <Marker position={nearestBranch.position} icon={defaultIcon}>
-                <Popup>
-                  Nearest Pharmacy: {nearestBranch.name} <br />
-                  {orderType === "pickup" ? "Ready for Pickup" : "Delivery in progress"}
-                </Popup>
-              </Marker>
+          {/* Prescription upload */}
+          {requiresPrescription && (
+            <div className="mb-4">
+              <label className="block mb-1 font-medium">Upload Prescription (required):</label>
+              <input type="file" accept=".pdf,.jpg,.png" onChange={handleUploadPrescription} />
+            </div>
+          )}
+
+          {/* Place Order Button */}
+          <button
+            onClick={handlePlaceOrder}
+            className="bg-green-600 text-white px-6 py-2 rounded"
+          >
+            Place Order
+          </button>
+        </div>
+      )}
+
+      {/* ORDER PLACED + MOCK PAYMENT */}
+      {orderPlaced && (
+        <div className="mt-6 p-6 bg-blue-50 border rounded text-center">
+          <h2 className="text-xl font-semibold mb-2">Order Sent to {confirmedPharmacy.name}</h2>
+
+          <p className="mt-2 mb-4">Please wait for pharmacy confirmation.</p>
+
+          <div>
+            <p className="mb-2">Payment:</p>
+            {!paymentDone ? (
+              <button
+                className="bg-yellow-500 px-6 py-2 rounded text-white"
+                onClick={() => setPaymentDone(true)}
+              >
+                Pay Now
+              </button>
+            ) : (
+              <p className="text-green-600 font-semibold">Payment completed!</p>
             )}
-          </MapContainer>
+          </div>
         </div>
       )}
     </div>
