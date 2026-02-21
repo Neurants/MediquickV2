@@ -1,27 +1,26 @@
-import React from "react";
+import React, { useContext } from "react";
+import { ERPContext } from "../context/ERPContext";
 
 export default function Sidebar() {
-  return (
-    <div className="w-64 h-screen bg-gray-900 text-white flex flex-col p-6">
-      <h1 className="text-2xl font-bold mb-10">MediQuick ERP</h1>
+  const { user, logout } = useContext(ERPContext);
 
-      <nav className="flex flex-col space-y-4 text-sm">
-        <a href="#" className="hover:text-blue-400 transition">
-          Dashboard
-        </a>
-        <a href="#" className="hover:text-blue-400 transition">
-          HR Management
-        </a>
-        <a href="#" className="hover:text-blue-400 transition">
-          CRM
-        </a>
-        <a href="#" className="hover:text-blue-400 transition">
-          Supply Chain
-        </a>
-        <a href="#" className="hover:text-blue-400 transition">
-          Inventory
-        </a>
-      </nav>
+  return (
+    <div className="w-64 bg-blue-900 text-white min-h-screen p-6">
+      <h1 className="text-2xl font-bold mb-10">MediQuick</h1>
+
+      <div className="space-y-6">
+        <div className="bg-blue-800 p-4 rounded">
+          <p className="font-semibold">Profile</p>
+          <p className="text-sm">{user?.email}</p>
+        </div>
+
+        <button
+          onClick={logout}
+          className="w-full bg-red-500 py-2 rounded hover:bg-red-600 transition"
+        >
+          Logout
+        </button>
+      </div>
     </div>
   );
 }
