@@ -37,7 +37,7 @@ export function ERPProvider({ children }) {
   const [prescriptions, setPrescriptions] = useState([]);
   const [orders, setOrders] = useState([]);
 
-  // LOGIN
+  // ================= LOGIN =================
   const login = (email, password) => {
     const foundUser = users.find(
       (u) =>
@@ -65,19 +65,19 @@ export function ERPProvider({ children }) {
     setUserRole(null);
   };
 
-  // DOCTOR FUNCTION
-  const addPrescription = (prescription) => {
-    setPrescriptions((prev) => [
-      ...prev,
-      {
-        ...prescription,
-        id: Date.now(),
-        status: "pending",
-      },
-    ]);
+  // ================= DOCTOR =================
+  const addPrescription = (data) => {
+    const newPrescription = {
+      id: Date.now(),
+      patient: data.patient,
+      medicine: data.medicine,
+      status: "pending",
+    };
+
+    setPrescriptions((prev) => [...prev, newPrescription]);
   };
 
-  // NURSE FUNCTION
+  // ================= NURSE =================
   const createOrderFromPrescription = (prescriptionId) => {
     const prescription = prescriptions.find(
       (p) => p.id === prescriptionId
@@ -85,20 +85,29 @@ export function ERPProvider({ children }) {
 
     if (!prescription) return;
 
-    setOrders((prev) => [
-      ...prev,
-      {
-        ...prescription,
-        orderId: Date.now(),
-        status: "ordered",
-      },
-    ]);
+    const newOrder = {
+      orderId: Date.now(),
+      patient: prescription.patient,
+      medicine: prescription.medicine,
+      status: "ordered",
+    };
+
+    setOrders((prev) => [...prev, newOrder]);
 
     setPrescriptions((prev) =>
       prev.map((p) =>
         p.id === prescriptionId
           ? { ...p, status: "sent to pharmacy" }
           : p
+      )
+    );
+  };
+
+  // ================= CLERK =================
+  const updateOrderStatus = (orderId, newStatus) => {
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.orderId === orderId ? { ...o, status: newStatus } : o
       )
     );
   };
@@ -117,6 +126,7 @@ export function ERPProvider({ children }) {
         orders,
         addPrescription,
         createOrderFromPrescription,
+        updateOrderStatus,
       }}
     >
       {children}
