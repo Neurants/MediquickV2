@@ -4,62 +4,54 @@ import { ERPContext } from "../context/ERPContext";
 export default function Login() {
   const { login } = useContext(ERPContext);
 
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
 
-  const handleLogin = (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-
-    const success = login(username, password);
-
-    if (!success) {
-      setError("Invalid credentials");
-    }
+    login(email, password);
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="bg-white p-8 shadow rounded w-96">
-        <h2 className="text-2xl font-bold mb-6 text-center">
-          MediQuick Login
-        </h2>
+    <div
+      className="min-h-screen flex items-center justify-center bg-cover bg-center relative"
+      style={{
+        backgroundImage: "url('/images/hospital-bg.png')",
+      }}
+    >
+      {/* Dark Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/80 via-purple-900/80 to-black/80"></div>
 
-        {error && (
-          <p className="text-red-600 text-sm mb-3">{error}</p>
-        )}
+      {/* Login Card */}
+      <div className="relative bg-white/10 backdrop-blur-md p-10 rounded-2xl shadow-2xl w-96 text-white border border-white/20">
+        <h1 className="text-3xl font-bold mb-6 text-purple-300 text-center">
+          MediQuick ERP
+        </h1>
 
-        <form onSubmit={handleLogin}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <input
-            type="text"
-            placeholder="Username"
-            className="w-full mb-3 p-2 border rounded"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            type="email"
+            placeholder="Email"
+            className="w-full p-3 rounded-lg bg-white/20 border border-white/20 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
           />
 
           <input
             type="password"
             placeholder="Password"
-            className="w-full mb-4 p-2 border rounded"
+            className="w-full p-3 rounded-lg bg-white/20 border border-white/20 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
 
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+            className="w-full bg-purple-600 hover:bg-purple-700 transition p-3 rounded-lg font-semibold"
           >
             Login
           </button>
         </form>
-
-        <div className="mt-4 text-sm text-gray-600">
-          <p><strong>Test Accounts:</strong></p>
-          <p>Admin → admin / admin123</p>
-          <p>Staff → staff / staff123</p>
-          <p>User → user / user123</p>
-        </div>
       </div>
     </div>
   );
